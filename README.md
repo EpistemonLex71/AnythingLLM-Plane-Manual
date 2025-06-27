@@ -118,3 +118,143 @@ A critical requirement for any MCP Server command to function correctly is that 
 
 anythingllm.autoStart: false within its configuration in the anythingllm\_mcp\_servers.json file.28
 
+
+ call from AnythingLLM, translate it into a Plane.so REST API request, execute it, and then return the Plane.so API's response back to AnythingLLM in an MCP-compatible format. This abstraction simplifies the interaction for the LLM, allowing it to focus on the task rather than the intricacies of the API.  
+3. **Configure AnythingLLM to Recognize the MCP Server:** Once the custom MCP server is developed and running, AnythingLLM needs to be informed of its existence. This is achieved by editing the anythingllm\_mcp\_servers.json configuration file, located in the AnythingLLM storage plugins directory.28 This JSON file will contain an entry for the new Plane.so MCP server, specifying its command (for StdIO transport) or URL (for SSE/Streamable transport) and any arguments or headers required.28  
+   * **Example anythingllm\_mcp\_servers.json entry (conceptual):**  
+     JSON  
+     {  
+       "mcpServers": {  
+         "plane-project-manager": {  
+           "command": "python3",  
+           "args":,  
+           "anythingllm": {  
+             "autoStart": true  
+           }  
+         }  
+       }  
+     }
+
+   * It is crucial to ensure that the Python executable (or Node.js, etc.) and the plane\_mcp\_server.py script are accessible from the host machine's PATH or specified with their full paths.29 AnythingLLM does not automatically install these dependencies. Setting  
+     autoStart: true will instruct AnythingLLM to attempt to launch this MCP server when the "Agent Skills" page is opened or an agent is invoked.29  
+4. **Test the MCP Server Integration in AnythingLLM:** After configuring AnythingLLM, navigate to the "Settings \-\> Agent Skills" page in the AnythingLLM UI. The newly added Plane.so MCP server should be visible, and its status can be monitored.28 From here, the server can be started, stopped, or reloaded if configuration## **Chapter 3: Connecting AnythingLLM to Plane.so for Project Tracking**
+
+Integrating AnythingLLM with Plane.so for project tracking involves setting up a custom Model Context Protocol (MCP) server. This server will translate natural language requests from AnythingLLM's AI agents into structured API calls that Plane.so can understand and execute.
+
+### **3.1 Configuring the Plane.so MCP Server for AnythingLLM Integration**
+
+The most effective strategy for connecting AnythingLLM to Plane.so is to develop a custom MCP server. This approach is preferred due to Plane.so's robust REST API and the significant advantages of using MCP for reliable LLM interaction. The custom MCP server will serve as an intermediary, encapsulating Plane.so's API endpoints and exposing them as well-defined "tools" that AnythingLLM's agents can discover and invoke.12 This method provides a standardized, robust, and LLM-friendly interface.
+
+#### **Prerequisites for Building a Custom MCP Server**
+
+Before commencing the development of a custom MCP server, several prerequisites must be met:
+
+* **Development Stack:** Select a suitable programming language and its corresponding MCP SDK. Popular and well-supported choices include Python, utilizing the anthropic-model-context-protocol SDK 30, or Node.js/TypeScript.31 The choice should align with the developer's expertise and existing infrastructure.  
+* **Runtime Environment:** Ensure that the necessary runtime environment for the chosen language (e.g., Python, Node.js) is correctly installed on the host machine where the custom MCP server will operate.31 This ensures the server can execute its code.  
+* **Plane.so API Key:** The Plane.so API Key, generated as detailed in Section 2.2, is essential. This key will be used by the MCP server to authenticate its requests to the Plane.so API.
+
+#### **Steps to Create a Basic Plane.so MCP Server (Conceptual Walkthrough)**
+
+The process of building a custom MCP server involves defining how it will interact with Plane.so's API and how AnythingLLM will then access these functionalities.
+
+1. **Define Plane.so API Interactions:** The initial step involves identifying the specific Plane.so API endpoints that will be exposed as callable tools for the AI agent. For project tracking, common functionalities include "Add Project," "Add Issue," "List Projects," and "Update Issue."  
+   * **Example: Add Project:** This functionality typically involves a POST request to the Plane.so API at /api/v1/workspaces/{workspace-slug}/projects/.6 The request body must be in JSON format and include essential parameters such as  
+     name, identifier, and description for the new project.6  
+   * **Example: Add Issue:** To create a new issue within a project, a POST request is sent to /api/v1/workspaces/:workspace-slug/projects/:project\_id/issues/.33 The JSON body for this request would include fields like  
+     name (required), description\_html or description\_stripped, priority, start\_date, target\_date, state (UUID), assignees (array of UUIDs), and labels (array of UUIDs).33  
+   * **Example: List Projects:** Retrieving a list of all projects in a workspace is accomplished with a GET request to https://api.plane.so/api/v1/workspaces/{workspace-slug}/projects/.5 This endpoint can be further refined using  
+     fields and expand query parameters to retrieve only specific data points (e.g., ?fields=id,name,description) or include related resources (e.g., ?expand=members).5  
+   * **Example: Update Issue:** Modifying an existing issue involves a PATCH request to /api/v1/workspaces/:workspace-slug/projects/:project\_id/issues/:issue\_id/.33 The request body would contain the fields to be updated, such as  
+     name, description, priority, or state.33  
+2. **Develop the Custom MCP Server:** This involves writing code that implements the identified Plane.so API interactions as MCP tools. For instance, using Python with the anthropic-model-context-protocol SDK, each Plane.so API call would correspond to a function decorated as an MCP tool. This function would handle the authentication with the Plane.so API key and format the request and response appropriately. An MCP server often wraps existing APIs, adding a "conversational layer" that makes them "LLM-friendly".12 This means the server will receive a structured tool changes are made.29  
+5. **Craft AnythingLLM Agent Prompts to Utilize Plane.so Tools:** With the MCP server integrated, AnythingLLM's AI agents can now be instructed to interact with Plane.so. This involves crafting prompts that explicitly direct the agent to use the newly exposed tools.  
+   * **Prompting Strategy:** When using AI agents in AnythingLLM, the @agent directive is used to initiate an agent session.19 The prompt should clearly state the desired action and provide all necessary parameters for the Plane.so API call. The LLM instruction block within agent flows is highly flexible and can leverage variables to dynamically shape the LLM's output.22  
+   * **Example Agent Prompts:**  
+     * To create a new project: @agent Create a new project in Plane.so called "Website Redesign" with the identifier "WEBREDESIGN" and a description "Revamp the company website for modern aesthetics and improved user experience."  
+     * To add an issue to an existing project: @agent Add an issue to the "Website Redesign" project (WEBREDESIGN) titled "Design Homepage Mockups" with high priority and assign it to John Doe. The description should be: "Create initial mockups for the new website homepage, focusing on visual appeal and user flow." (Assuming the MCP server can resolve "John Doe" to a Plane.so user UUID).  
+     * To list projects: @agent List all projects in Plane.so.  
+     * To update an issue: @agent Update the issue "Design Homepage Mockups" in project "WEBREDESIGN" to 'Completed'.  
+6. **Process Responses from Plane.so:** When an agent successfully executes a Plane.so tool via the MCP server, the response from the Plane.so API is returned to AnythingLLM. The agent can then process this response, summarize it, or use it to inform subsequent actions or provide feedback to the user. For instance, after creating a project, the agent could confirm its creation and provide the new project's identifier.
+
+## **Chapter 4: Maintaining the User Manual on GitHub with AI Assistance**
+
+While direct GitHub MCP server integration presented challenges, a robust AI-assisted manual workflow can effectively maintain an up-to-the-minute user manual on GitHub. This approach leverages GitHub's inherent version control capabilities and Markdown support, augmented by AnythingLLM's content generation features.
+
+### **4.1 GitHub Repository Setup for Documentation**
+
+GitHub functions as a robust platform for managing living documentation, extending beyond its primary role as a code repository. Its core version control features—commits, branches, and pull requests—are perfectly suited for a user manual that requires continuous updates.
+
+#### **Creating a Dedicated Repository**
+
+To begin, a dedicated GitHub repository should be created to house the user manual. This provides a centralized and version-controlled location for all documentation.
+
+1. **Repository Creation:** Navigate to GitHub, select the "New repository" option, and provide a short, memorable name (e.g., "AnythingLLM-Plane-Manual"). An optional description can be added, and the repository's visibility (public or private) should be chosen based on access requirements. It is recommended to initialize the repository with a README.md file.7  
+2. **Local Clone:** To work with the repository locally, use the git clone command in the command line, navigating to the desired directory.9 For example:  
+   git clone https://github.com/your-username/AnythingLLM-Plane-Manual.git.
+
+#### **Basic Git Commands for Documentation Management**
+
+Proficiency in fundamental Git commands is essential for managing changes to the manual:
+
+* git status: Displays the status of changes in the working directory and staging area.9  
+* git add \<file\>: Stages changes from the working directory, preparing them for a commit.9  
+* git commit \-m "Commit message": Records the staged snapshot to the project history with a descriptive message.9  
+* git push: Uploads local commits to the remote GitHub repository.7  
+* git pull: Downloads changes from the remote repository and merges them into the current local branch.9  
+* git branch \<branch-name\>: Creates a new branch, allowing for isolated development environments for documentation updates.9  
+* git checkout \<branch-name\>: Switches to an existing branch.9
+
+#### **Markdown for User Manual Content**
+
+GitHub natively supports Markdown, which is an easy-to-read and easy-to-write language for formatting plain text.10 This makes it an ideal choice for authoring user manuals due to its simplicity and readability.
+
+* **Headings:** Use hash symbols (\#) for headings (e.g., \# Chapter 1, \#\# Section, \#\#\# Subsection).11  
+* **Emphasis:** Use asterisks (\*\*bold\*\*) or underscores (\_italic\_) for emphasis.34  
+* **Lists:** Create bulleted lists with hyphens or asterisks, and numbered lists with numbers followed by a period.11  
+* **Code Blocks:** Enclose code snippets in triple backticks for syntax highlighting (e.g., python\\nprint("Hello")).11  
+* **Links:** Create clickable links using (URL).23  
+* **Tables:** Markdown supports tables for organizing information.10
+
+LLMs tend to process Markdown effectively because its structured nature reduces ambiguity and improves parsing.15 This is beneficial for AI-assisted content generation, as it ensures the output is consistently formatted and easily interpretable.
+
+### **4.2 AI-Assisted Manual Update Workflow (Manual with AI Support)**
+
+Given the challenges with direct GitHub MCP server integration, a pragmatic workflow involves leveraging AnythingLLM for content generation, with human oversight for review and commitment to GitHub. This ensures reliability and control over documentation.
+
+#### **AI-Powered Content Generation from AnythingLLM**
+
+AnythingLLM can significantly streamline the creation and updating of user manual content through its AI capabilities:
+
+* **Content Generation:** AnythingLLM can generate drafts based on existing materials, check consistency across related content pieces, and repurpose content for different formats or audiences.1 This includes generating code snippets, which can be useful for technical documentation.36  
+* **Summarization:** AnythingLLM excels at summarizing lengthy documents into digestible insights.1 For manual updates, this could involve summarizing changes in a software version or new feature descriptions. The  
+  Summarize Documents tool available to agents can be explicitly used for this purpose (e.g., @agent can you summarize the content on https://docs.anythingllm.com/features/chat-logs.).19  
+* **Structured Text Generation:** By providing clear prompts, AnythingLLM can be guided to generate content in structured Markdown format, which is ideal for GitHub documentation.15 The LLM instruction block is a powerful tool for this, allowing precise instructions to be given to the LLM, leveraging variables for dynamic output.22 For example, a prompt could instruct the AI to "Extract all key features from this text and format them as a Markdown bulleted list under a 'Features' heading."
+
+#### **The AI-Assisted Manual Update Process**
+
+This workflow combines AI efficiency with human quality control:
+
+1. **AI Content Draft Generation:**  
+   * **Prompt AnythingLLM:** Use AnythingLLM's chat interface or agent flows to generate content for the manual. For example, instruct an agent: @agent Generate a step-by-step guide in Markdown for setting up a new project in Plane.so, including details on name, identifier, and description. Refer to the Plane.so API documentation for accuracy.  
+   * **Leverage Existing Information:** If relevant Plane.so documentation or internal notes are embedded in AnythingLLM workspaces, the RAG capabilities can ensure the generated content is accurate and contextually rich.2  
+   * **Specify Output Format:** Always instruct the LLM to output content in Markdown, specifying desired headings, lists, and code blocks.15  
+2. **Human Review and Refinement:**  
+   * **Copy AI Output:** Copy the Markdown content generated by AnythingLLM.  
+   * **Review for Accuracy and Tone:** Critically review the AI-generated draft for factual accuracy, clarity, conciseness, and adherence to the manual's established tone and style.38 LLMs can sometimes "hallucinate" or produce subtly inaccurate information, so human verification is essential.37  
+   * **Edit and Enhance:** Make any necessary edits, add specific details, or rephrase sections for improved readability.  
+3. **GitHub Integration (Manual Commit Process):**  
+   * **Create a New Branch:** Before making changes, create a new Git branch for the update (e.g., git checkout \-b update-plane-setup).8 This isolates changes and facilitates review.  
+   * **Update Markdown File:** Paste the refined Markdown content into the appropriate file (e.g., plane-setup.md) within your local repository.  
+   * **Stage and Commit Changes:** Use git add to stage the modified file, followed by git commit \-m "Descriptive commit message" to save the changes locally.7 The commit message should clearly describe the update.  
+   * **Push to GitHub:** Push the new branch and its commits to your GitHub repository: git push \--set-upstream origin update-plane-setup.7  
+   * **Open a Pull Request (PR):** On GitHub, open a pull request from your new branch to the main (or default) branch.8 This allows for peer review and discussion.  
+   * **Merge PR:** Once reviewed and approved, merge the pull request into the main branch.8 This updates the live user manual.  
+   * **Delete Branch:** After merging, the feature branch can be safely deleted.8
+
+#### **Ensuring Up-to-the-Minute Information**
+
+To ensure the manual is "constantly update\[d\] with up to the minute information," a systematic approach is necessary:
+
+* **Regular Review Cycle:** Establish a routine for reviewing sections of the manual. This could be triggered by new software releases, feature updates in Plane.so, or a predefined schedule.  
+* **AI-Assisted Change Detection:** AnythingLLM agents could potentially be configured (e.g., using web scraping tools) to monitor Plane.so's official documentation or release notes. The agent could then summarize detected changes and suggest updates for the manual, prompting the user to review and integrate them.19  
+* **Prompting for Updates:** When new information becomes available, prompt AnythingLLM with the new data and the relevant section of the existing manual, asking it to generate an updated version or highlight necessary changes. This leverages AI for rapid content iteration while maintaining human control over publication.
