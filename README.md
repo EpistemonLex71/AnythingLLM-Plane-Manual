@@ -68,6 +68,7 @@ The significance of this integration lies in its capacity to leverage artificial
 
 A particular challenge addressed within this manual pertains to the integration of GitHub. Acknowledging previous difficulties with direct GitHub MCP server integration, this guide offers a pragmatic, AI-assisted *manual* workflow for GitHub. This approach ensures reliability and granular control over documentation, while still harnessing the strengths of AI for content creation and maintenance.
 
+```mermaid
 graph TD
     A[User] --> B(AnythingLLM);
     B --> C(MCP Server);
@@ -113,7 +114,7 @@ graph TD
     style C fill:#cfc,stroke:#333,stroke-width:2px
     style D fill:#ffc,stroke:#333,stroke-width:2px
     style E fill:#cff,stroke:#333,stroke-width:2px
-
+```
 
 ## Chapter 1: Introduction to Your Integrated Workflow
 
