@@ -68,6 +68,53 @@ The significance of this integration lies in its capacity to leverage artificial
 
 A particular challenge addressed within this manual pertains to the integration of GitHub. Acknowledging previous difficulties with direct GitHub MCP server integration, this guide offers a pragmatic, AI-assisted *manual* workflow for GitHub. This approach ensures reliability and granular control over documentation, while still harnessing the strengths of AI for content creation and maintenance.
 
+graph TD
+    A[User] --> B(AnythingLLM);
+    B --> C(MCP Server);
+    C --> D(Plane.so API);
+    D --> C;
+    C --> B;
+    B --> A;
+    A --> E(GitHub);
+    B --> E;
+    E --> A;
+
+    %% Interactions
+    B -- Calls Tools via --> C;
+    C -- Translates & Calls --> D;
+    D -- Responds to --> C;
+    C -- Returns Result to --> B;
+    B -- Presents Info to --> A;
+    A -- Manual Interaction --> E;
+    B -- AI-Assisted Content --> E;
+    E -- Version Control & Docs --> A;
+
+    %% Sub-processes/Notes
+    subgraph Plane.so
+        D
+    end
+
+    subgraph Documentation Workflow
+        A -- Review & Edit --> E;
+        B -- Generate Drafts --> A;
+    end
+
+    subgraph Project Tracking Workflow
+        A -- Ideas/Prompts --> B;
+        B -- Create/Update Tasks --> C;
+        C -- Manage Tasks --> D;
+        D -- Task Data --> C;
+        C -- Task Status --> B;
+        B -- Report Status --> A;
+    end
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#ccf,stroke:#333,stroke-width:2px
+    style C fill:#cfc,stroke:#333,stroke-width:2px
+    style D fill:#ffc,stroke:#333,stroke-width:2px
+    style E fill:#cff,stroke:#333,stroke-width:2px
+
+
 ## Chapter 1: Introduction to Your Integrated Workflow
 
 ### 1.1 Overview of AnythingLLM, Plane.so, and GitHub for Enhanced Productivity
